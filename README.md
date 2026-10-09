@@ -1,3 +1,9 @@
+---
+title: AI Mock Interviewer
+sdk: docker
+app_port: 8000
+---
+
 # 🎙️ AI Mock Interviewer
 
 Practice technical interviews with an AI interviewer — right in your browser.

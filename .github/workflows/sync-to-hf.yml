@@ -1,0 +1,59 @@
+name: Sync to Hugging Face Space
+
+# Mirrors this repo to a Hugging Face Docker Space on every push to main
+# (and on manual runs). The Space is configured entirely through repository
+# variables/secrets — nothing is hardcoded:
+#
+#   vars.HF_USERNAME    - Hugging Face username that owns the Space
+#   vars.HF_SPACE_NAME  - name of the Space repository
+#   secrets.HF_TOKEN    - Hugging Face access token with WRITE permission
+#
+# Set them under: GitHub repo → Settings → Secrets and variables → Actions.
+# Until all three are set, this workflow skips gracefully (green run, no push).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-to-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Hugging Face configuration
+        id: cfg
+        env:
+          HF_USERNAME: ${{ vars.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          missing=""
+          [ -z "$HF_USERNAME" ]   && missing="$missing vars.HF_USERNAME"
+          [ -z "$HF_SPACE_NAME" ] && missing="$missing vars.HF_SPACE_NAME"
+          [ -z "$HF_TOKEN" ]     && missing="$missing secrets.HF_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping Hugging Face sync — not configured yet. Missing:$missing. Add them in Settings → Secrets and variables → Actions, then re-run this workflow."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Hugging Face sync configured for space: ${HF_USERNAME}/${HF_SPACE_NAME}"
+          fi
+
+      - name: Check out repository
+        if: steps.cfg.outputs.configured == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face Space
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          HF_USERNAME: ${{ vars.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          HF_SPACE_URL="https://huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}"
+          echo "Syncing to ${HF_SPACE_URL}"
+          git remote add hf "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}"
+          git push hf main:main --force
