@@ -20,6 +20,15 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
 
+# Pin the psycopg2 driver explicitly. A bare postgresql:// URL silently
+# changed meaning in SQLAlchemy 2.1: its default dialect became psycopg (v3),
+# whose package we do not install (requirements carry psycopg2-binary), so
+# create_engine() died at import with "No module named 'psycopg'" — taking
+# the whole app down on Vercel, where DATABASE_URL points at Postgres.
+# Locally this stayed hidden because an unset DATABASE_URL means SQLite.
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
+
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
